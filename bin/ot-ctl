@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if [ "$(docker inspect -f '{{.State.Running}}' addon_core_openthread_border_router 2>/dev/null)" != "true" ]; then
+  echo "OpenThread Border Router add-on not installed or not running"
+  exit 1
+fi
+
+docker exec -it addon_core_openthread_border_router /usr/sbin/ot-ctl "$@"
