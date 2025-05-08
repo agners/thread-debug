@@ -1,0 +1,29 @@
+#!/bin/sh
+
+if [ "$(docker inspect -f '{{.State.Running}}' addon_core_openthread_border_router 2>/dev/null)" != "true" ]; then
+  echo "Matter Server add-on not installed or not running"
+  exit 1
+fi
+
+if ! command -v websocat >/dev/null 2>&1; then
+  echo "Error: 'websocat' is not installed."
+  echo "You can install it with:"
+  echo "  apk add websocat"
+  exit 1
+fi
+
+function show_info() {
+  json=$(websocat --exit-on-eof -1 ws://core-matter-server:5580/ws)
+  printf "Compressed Fabric ID: %016X\n" $(echo "$json" | jq -r '.compressed_fabric_id')
+  echo "SDK Version: $(echo "$json" | jq -r '.sdk_version')"
+}
+
+case "$1" in
+  info)
+    show_info
+    ;;
+  *)
+    echo "Usage: matter-server {info}"
+    exit 1
+    ;;
+esac
