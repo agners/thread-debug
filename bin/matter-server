@@ -58,8 +58,8 @@ function list_nodes() {
 
   fabric=$(echo "$welcome" | jq -r '.compressed_fabric_id')
 
-  echo -e "Node ID  DNS-SD Name                             Manufacturer           Product Name                        Date Commissioned             Thread Network"
-  echo "---------------------------------------------------------------------------------------------------------------------------------------------------------------"
+  echo -e "Node ID  DNS-SD Service Name                Manufacturer                     Product Name                                  Date Commissioned             Thread Network"
+  echo "------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
 
   echo "$response" | jq -r '
     .result[] |
@@ -72,7 +72,7 @@ function list_nodes() {
     ] | @tsv
   ' | while IFS=$'\t' read -r node_id manufacturer product_name date_commissioned thread_name; do
     dns_sd_name=$(printf "%016X-%016X" "$fabric" "$node_id")
-    printf "%-8s %-40s %-20s %-35s %-30s %-20s\n" "$node_id" "$dns_sd_name" "$manufacturer" "$product_name" "$date_commissioned" "$thread_name"
+    printf "%-8s %-35s %-30s %-45s %-30s %-20s\n" "$node_id" "$dns_sd_name" "$manufacturer" "$product_name" "$date_commissioned" "$thread_name"
   done
 }
 
