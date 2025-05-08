@@ -31,7 +31,7 @@ function send_command() {
   # Start coprocess, suppress job startup messages
   { coproc WS { websocat --linemode-strip-newlines --buffer-size=1048576 "$matter_ws"; }; } 2>/dev/null
 
-  read -r server_welcome <&"${WS[0]}"
+  read -r welcome <&"${WS[0]}"
 
   if [ -n "$args" ]; then
     jq -nc --arg msgid "$msgid" --arg cmd "$cmd" --argjson args "$args" \
@@ -51,12 +51,17 @@ function send_command() {
 
   # Restore job notifications if desired
   set -m
-
-  echo "$response"
 }
 
 function list_nodes() {
-  send_command "2" "get_nodes" | jq -r '
+  send_command "2" "get_nodes"
+
+  fabric=$(echo "$welcome" | jq -r '.compressed_fabric_id')
+
+  echo -e "Node ID  DNS-SD Name                             Manufacturer           Product Name                        Date Commissioned             Thread Network"
+  echo "---------------------------------------------------------------------------------------------------------------------------------------------------------------"
+
+  echo "$response" | jq -r '
     .result[] |
     [
       .node_id,
@@ -65,19 +70,11 @@ function list_nodes() {
       .date_commissioned,
       (.attributes["0/53/2"] // "—")
     ] | @tsv
-  ' | awk -F '\t' '
-  BEGIN {
-    printf "%-8s %-8s %-20s %-35s %-30s %-20s\n", "NodeID", "HexID", "Manufacturer", "Product Name", "Date Commissioned", "Thread Network"
-    printf "%s\n", gensub(/./, "-", "g", sprintf("%-8s %-8s %-20s %-35s %-30s %-20s", "", "", "", "", "", ""))
-  }
-  {
-    hexid = sprintf("0x%X", $1)
-    printf "%-8s %-8s %-20s %-35s %-30s %-20s\n", $1, hexid, $2, $3, $4, $5
-  }
-  '
+  ' | while IFS=$'\t' read -r node_id manufacturer product_name date_commissioned thread_name; do
+    dns_sd_name=$(printf "%016X-%016X" "$fabric" "$node_id")
+    printf "%-8s %-40s %-20s %-35s %-30s %-20s\n" "$node_id" "$dns_sd_name" "$manufacturer" "$product_name" "$date_commissioned" "$thread_name"
+  done
 }
-
-
 
 case "$1" in
   info)
