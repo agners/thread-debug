@@ -1,6 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
-if [ "$(docker inspect -f '{{.State.Running}}' addon_core_openthread_border_router 2>/dev/null)" != "true" ]; then
+matter_ws="ws://core-matter-server:5580/ws"
+
+if [ "$(docker inspect -f '{{.State.Running}}' addon_core_matter_server 2>/dev/null)" != "true" ]; then
   echo "Matter Server add-on not installed or not running"
   exit 1
 fi
@@ -13,17 +15,79 @@ if ! command -v websocat >/dev/null 2>&1; then
 fi
 
 function show_info() {
-  json=$(websocat --exit-on-eof -1 ws://core-matter-server:5580/ws)
+  json=$(websocat --exit-on-eof -1 "$matter_ws")
   printf "Compressed Fabric ID: %016X\n" $(echo "$json" | jq -r '.compressed_fabric_id')
   echo "SDK Version: $(echo "$json" | jq -r '.sdk_version')"
 }
+
+function send_command() {
+  local msgid="$1"
+  local cmd="$2"
+  local args="$3"
+
+  # Disable job notifications temporarily
+  set +m  # Disable monitor mode (job control)
+
+  # Start coprocess, suppress job startup messages
+  { coproc WS { websocat --linemode-strip-newlines --buffer-size=1048576 "$matter_ws"; }; } 2>/dev/null
+
+  read -r server_welcome <&"${WS[0]}"
+
+  if [ -n "$args" ]; then
+    jq -nc --arg msgid "$msgid" --arg cmd "$cmd" --argjson args "$args" \
+      '{message_id: $msgid, command: $cmd, args: $args}' >&"${WS[1]}"
+  else
+    jq -nc --arg msgid "$msgid" --arg cmd "$cmd" \
+      '{message_id: $msgid, command: $cmd}' >&"${WS[1]}"
+  fi
+
+  read -r response <&"${WS[0]}"
+
+  # Close FDs and wait for coproc to finish
+  exec {WS[1]}>&-
+  exec {WS[0]}>&-
+
+  wait "$WS_PID" 2>/dev/null
+
+  # Restore job notifications if desired
+  set -m
+
+  echo "$response"
+}
+
+function list_nodes() {
+  send_command "2" "get_nodes" | jq -r '
+    .result[] |
+    [
+      .node_id,
+      .attributes["0/40/1"],
+      .attributes["0/40/3"],
+      .date_commissioned,
+      (.attributes["0/53/2"] // "—")
+    ] | @tsv
+  ' | awk -F '\t' '
+  BEGIN {
+    printf "%-8s %-8s %-20s %-35s %-30s %-20s\n", "NodeID", "HexID", "Manufacturer", "Product Name", "Date Commissioned", "Thread Network"
+    printf "%s\n", gensub(/./, "-", "g", sprintf("%-8s %-8s %-20s %-35s %-30s %-20s", "", "", "", "", "", ""))
+  }
+  {
+    hexid = sprintf("0x%X", $1)
+    printf "%-8s %-8s %-20s %-35s %-30s %-20s\n", $1, hexid, $2, $3, $4, $5
+  }
+  '
+}
+
+
 
 case "$1" in
   info)
     show_info
     ;;
+  list-nodes)
+    list_nodes
+    ;;
   *)
-    echo "Usage: matter-server {info}"
+    echo "Usage: matter-server {info|list-nodes}"
     exit 1
     ;;
 esac
