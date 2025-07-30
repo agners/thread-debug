@@ -41,4 +41,23 @@ random identifiers, so this makes Matter devices paired to the Home Assitant
 Matter Controller stand out with a couple of zeros, e.g.
 `0D3C0DBDDE928E1D-000000000000000D` (Matter Node ID 15).
 
+## Gaining insights into the Thread mesh
+
+The `ot-cli` allows to use the `meshdiag` commands, which show more in-depth
+information about the Thread mesh network
+
+```
+ot-ctl meshdiag topology ip6-addrs children
+```
+
+You'll see a list of active Thread router devices (border routers as well as
+normal mesh only router devices). For devices which support meshdiag and who
+have children the child table can be read using their rloc16 address:
+
+```
+ot-ctl meshdiag childtable 0x9c00
+```
+
+
+
 
