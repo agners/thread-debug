@@ -4,7 +4,7 @@ This is meant to run in Advanced SSH & Web Terminal add-on with privileges.
 
 To install or update use:
 ```sh
-curl -fsSL https://raw.githubusercontent.com/agners/thread-debug/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/agners/thread-debug/main/install.sh | zsh
 ```
 
 Commands available:
